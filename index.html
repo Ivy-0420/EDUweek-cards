@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>啟程？有我陪你！</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+    font-family: "FangSong", "仿宋", serif;
+    background: #F0ECE3;
+    margin: 0;
+    padding: 20px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 36px;
+    color: #4E697A;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    text-align: center;
+    font-weight: normal;
+    font-size: 18px;
+    color: #555;
+    margin-bottom: 12px;
+  }
+
+  .new-card, .card {
+    border-radius: 16px;
+    padding: 16px;
+    margin: 20px auto;
+    max-width: 600px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    font-family: "FangSong", "仿宋", serif;
+  }
+
+  /* 外層卡片藍色 */
+  .new-card {
+    background-color: #8FA6B6;
+    color: black;
+    border: none;
+  }
+
+  /* 文字格子背景淺色 */
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #fff;
+    background-color: #F0ECE3;
+    color: black;
+    font-size: 14px;
+    resize: vertical;
+  }
+
+  button.send-btn {
+    margin-top: 8px;
+    background-color: #4E697A;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  button.send-btn:hover { background-color: #3B5360; }
+
+  /* 卡片 */
+  .card {
+    background-color: #8FA6B6;
+    color: white;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.4s ease;
+  }
+
+  .card.show { opacity: 1; transform: translateY(0); }
+
+  /* 回覆 */
+  .reply {
+    background: #E0DCCF;
+    color: black;
+    padding: 8px;
+    border-radius: 8px;
+    margin-top: 6px;
+    font-size: 14px;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: all 0.3s ease;
+  }
+
+  .reply.show { opacity: 1; transform: translateY(0); }
+
+  .replies { margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>啟程？有我陪你！</h1>
+<h2>在這裡匿名分享你的心情，看看別人的故事吧 💌</h2>
+
+<!-- 輸入區 -->
+<div class="new-card">
+  <textarea id="newCardText" placeholder="寫下一段想說的話..."></textarea>
+  <button class="send-btn" onclick="addCard()">送出</button>
+</div>
+
+<!-- 卡片區 -->
+<div id="cards"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// Firebase 設定
+const firebaseConfig = {
+  apiKey: "AIzaSyARRz3hZdeNufniI7gHOLjMMml2K3nx8JU",
+  authDomain: "card-d624c.firebaseapp.com",
+  projectId: "card-d624c",
+  storageBucket: "card-d624c.firebasestorage.app",
+  messagingSenderId: "135428677793",
+  appId: "1:135428677793:web:852dfa5ede957c831850e0"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const userId = localStorage.getItem("userId") || Date.now().toString();
+localStorage.setItem("userId", userId);
+
+const cardsDiv = document.getElementById("cards");
+
+// 新增卡片
+async function addCard() {
+  const newCardText = document.getElementById("newCardText");
+  const text = newCardText.value.trim();
+  if(!text) return;
+
+  await addDoc(collection(db,"cards"),{
+    content: text,
+    createdAt: serverTimestamp(),
+    userId: userId
+  });
+
+  newCardText.value="";
+  loadCards();
+}
+
+// 渲染卡片
+function renderCard(cardId, text, replies){
+  const card = document.createElement("div");
+  card.className="card";
+
+  const contentDiv = document.createElement("div");
+  contentDiv.innerText = text;
+  card.appendChild(contentDiv);
+
+  const repliesDiv = document.createElement("div");
+  repliesDiv.className="replies";
+  card.appendChild(repliesDiv);
+
+  replies.forEach(r=>{
+    const replyDiv = document.createElement("div");
+    replyDiv.className="reply";
+    replyDiv.innerText = r.content;
+    repliesDiv.appendChild(replyDiv);
+    setTimeout(()=>replyDiv.classList.add("show"),10);
+  });
+
+  const replyInput = document.createElement("textarea");
+  replyInput.placeholder="匿名回覆這張卡片...";
+  card.appendChild(replyInput);
+
+  const replyBtn = document.createElement("button");
+  replyBtn.className="send-btn";
+  replyBtn.innerText="回覆";
+  replyBtn.setAttribute("onclick", `addReply("${cardId}", this.previousElementSibling.value, this.previousElementSibling)`);
+  card.appendChild(replyBtn);
+
+  cardsDiv.prepend(card);
+  setTimeout(()=>card.classList.add("show"),10);
+}
+
+// 回覆卡片
+async function addReply(cardId, text, inputElement){
+  const replyText = text.trim();
+  if(!replyText) return;
+
+  await addDoc(collection(db,"cards",cardId,"replies"),{
+    content: replyText,
+    createdAt: serverTimestamp(),
+    userId: userId
+  });
+
+  inputElement.value="";
+  loadCards();
+}
+
+// 載入所有卡片
+async function loadCards(){
+  cardsDiv.innerHTML="";
+  const snapshot = await getDocs(collection(db,"cards"));
+  snapshot.forEach(async doc=>{
+    const data = doc.data();
+    const repliesSnapshot = await getDocs(collection(db,"cards",doc.id,"replies"));
+    const replies = repliesSnapshot.docs.map(d=>d.data()).filter(r=>r.userId);
+    renderCard(doc.id, data.content, replies);
+  });
+}
+
+// 初始載入
+loadCards();
+</script>
+</body>
+</html>
